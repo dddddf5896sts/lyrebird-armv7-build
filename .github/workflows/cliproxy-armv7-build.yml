@@ -1,0 +1,62 @@
+name: Build CLIProxyAPI ARMv7
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/dddddf5896sts/cliproxy-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CLIProxyAPI
+        uses: actions/checkout@v4
+        with:
+          repository: router-for-me/CLIProxyAPI
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Cross-compile ARMv7 binary
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
+            go build -trimpath -ldflags="-s -w" -o dist/CLIProxyAPI ./cmd/server/
+
+      - name: Write container Dockerfile
+        run: |
+          cat > Dockerfile.armv7 <<'EOF'
+          FROM debian:bookworm-slim
+          RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata \
+            && rm -rf /var/lib/apt/lists/*
+          RUN mkdir /CLIProxyAPI
+          COPY dist/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
+          COPY config.example.yaml /CLIProxyAPI/config.example.yaml
+          WORKDIR /CLIProxyAPI
+          ENV TZ=Asia/Shanghai
+          EXPOSE 8317
+          CMD ["./CLIProxyAPI"]
+          EOF
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.armv7
+          platforms: linux/arm/v7
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:{{date 'YYYYMMDD'}}
