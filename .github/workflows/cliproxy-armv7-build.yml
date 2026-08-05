@@ -59,4 +59,4 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:{{date 'YYYYMMDD'}}
+            ${{ env.IMAGE }}:${{ github.sha }}
