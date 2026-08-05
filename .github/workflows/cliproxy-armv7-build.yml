@@ -28,6 +28,15 @@ jobs:
         with:
           go-version: "1.26"
 
+      - name: Patch panel download to use local proxy (not Tor)
+        run: |
+          set -euo pipefail
+          # Panel updater shares the global proxy-url (currently Tor). Force the
+          # panel download to bypass Tor and use the LAN/local SOCKS5 instead.
+          sed -i 's|newHTTPClient(cfg.ProxyURL)|newHTTPClient("socks5h://host.docker.internal:7890")|g' \
+            internal/managementasset/updater.go
+          grep -n "socks5h://host.docker.internal:7890" internal/managementasset/updater.go
+
       - name: Cross-compile ARMv7 binary
         run: |
           set -euo pipefail
