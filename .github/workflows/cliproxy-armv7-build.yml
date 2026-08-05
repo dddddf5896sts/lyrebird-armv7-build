@@ -28,14 +28,13 @@ jobs:
         with:
           go-version: "1.26"
 
-      - name: Patch panel download to use local proxy (not Tor)
+      - name: Download management panel (bundle at build time)
         run: |
           set -euo pipefail
-          # Panel updater shares the global proxy-url (currently Tor). Force the
-          # panel download to bypass Tor and use the LAN/local SOCKS5 instead.
-          sed -i 's|newHTTPClient(cfg.ProxyURL)|newHTTPClient("socks5h://host.docker.internal:7890")|g' \
-            internal/managementasset/updater.go
-          grep -n "socks5h://host.docker.internal:7890" internal/managementasset/updater.go
+          mkdir -p static
+          curl -fsSL -o static/management.html \
+            "https://github.com/router-for-me/Cli-Proxy-API-Management-Center/releases/latest/download/management.html"
+          ls -la static/management.html
 
       - name: Cross-compile ARMv7 binary
         run: |
@@ -50,11 +49,13 @@ jobs:
           FROM debian:bookworm-slim
           RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata \
             && rm -rf /var/lib/apt/lists/*
-          RUN mkdir /CLIProxyAPI
+          RUN mkdir -p /CLIProxyAPI/static
           COPY dist/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
           COPY config.example.yaml /CLIProxyAPI/config.example.yaml
+          COPY static/management.html /CLIProxyAPI/static/management.html
           WORKDIR /CLIProxyAPI
           ENV TZ=Asia/Shanghai
+          ENV MANAGEMENT_STATIC_PATH=/CLIProxyAPI/static/management.html
           EXPOSE 8317
           CMD ["./CLIProxyAPI"]
           EOF
